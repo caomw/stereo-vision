@@ -232,13 +232,10 @@ against OpenCV versions: 2.4.
 #include <iCub/stereoVision/stereoCamera.h>
 
 #include "fastBilateral.h"
+#include "eyesCalibration.h"
 
 #ifdef USING_GPU
     #include <iCub/stereoVision/utils.h>
-#endif
-
-#ifdef USING_IPOPT
-    #include "ipopt/eyesCalibration.h"
 #endif
 
 #define LEFT    0

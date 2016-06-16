@@ -20,7 +20,7 @@
 #include <yarp/math/Math.h>
 
 
-/*******************************************************/
+/**************************************************************************/
 struct CalibrationData
 {
     yarp::sig::Matrix eye_kin_left;
@@ -33,14 +33,14 @@ struct CalibrationData
 };
 
 
-/*******************************************************/
+/**************************************************************************/
 class EyesCalibration
 {
     std::deque<CalibrationData> data;
 
 public:
     CalibrationData &addData();
-    bool runCalibration(yarp::sig::Matrix &extrinsics_left,
-                        yarp::sig::Matrix &extrinsics_right);
+    double runCalibration(yarp::sig::Matrix &extrinsics_left,
+                          yarp::sig::Matrix &extrinsics_right);
 };
 
