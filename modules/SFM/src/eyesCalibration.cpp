@@ -274,10 +274,11 @@ CalibrationData &EyesCalibration::addData()
 double EyesCalibration::runCalibration(Matrix &extrinsics_left,
                                        Matrix &extrinsics_right)
 {
-    Optimizer swarm(data);
-
     Rand::init();
-    swarm.init();
+
+    Optimizer swarm(data);
+    swarm.getParameters().maxT=10.0;    
+    swarm.init();    
 
     int cnt=0;
     double t0=Time::now();
