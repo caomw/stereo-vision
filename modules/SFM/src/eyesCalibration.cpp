@@ -284,8 +284,16 @@ double EyesCalibration::runCalibration(Matrix &extrinsics_left,
     Rand::init();
     swarm.init();
 
+    int cnt=0;
     double t0=Time::now();
-    while (swarm.step());
+    while (swarm.step())
+    {
+        if (++cnt>=10)
+        {
+            Time::yield();
+            cnt=0;
+        }
+    }
     double t=Time::now()-t0;
 
     const Particle &g=swarm.finalize();    
