@@ -57,12 +57,9 @@ struct Parameters
                    cost(0.0)
     {
         lim.resize(6,2);
-
-        // translation [m]
         lim(0,0)=-0.1;      lim(0,1)=0.1;
         lim(1,0)=-0.1;      lim(1,1)=0.1;
         lim(2,0)=-0.1;      lim(2,1)=0.1;
-        // orientation rpy [rad]
         lim(3,0)=-M_PI;     lim(3,1)=M_PI;
         lim(4,0)=-M_PI/2.0; lim(4,1)=M_PI/2.0;
         lim(5,0)=-M_PI;     lim(5,1)=M_PI;
@@ -187,12 +184,10 @@ public:
     /**************************************************************************/
     void init()
     {
-        // create particles and init them randomly
         x.assign(parameters.numParticles,Particle());
         randomize();
         p=x;
         
-        // evaluate the best particle g before starting
         for (size_t i=0; i<x.size(); i++)
             if (evaluate(p[i])<g.cost)
                 g=p[i];
@@ -297,8 +292,8 @@ double EyesCalibration::runCalibration(Matrix &extrinsics_left,
     double t=Time::now()-t0;
 
     const Particle &g=swarm.finalize();    
-    yInfo()<<"solution: "<<g.pos.toString(5,5)
-           <<" found in "<<t<<" [s]";
+    yInfo()<<"solution: ("<<g.pos.toString(5,5)<<") "
+           <<"found in "<<t<<" [s]";
 
     swarm.getExtrinsics(g.pos,extrinsics_left,extrinsics_right);    
     return g.cost;
