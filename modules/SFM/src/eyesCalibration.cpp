@@ -168,13 +168,13 @@ public:
         if (x.length()>=6)
         {
             Hr=rpy2dcm(x.subVector(3,5)); 
-            Hr.setCol(3,x.subVector(0,2));
+            Hr.setSubcol(x.subVector(0,2),0,3);
 
             Vector y=x;
             y[0]=-y[0];
             y[5]=-y[5];
             Hl=rpy2dcm(y.subVector(3,5));
-            Hl.setCol(3,y.subVector(0,2));
+            Hl.setSubcol(y.subVector(0,2),0,3);
             return true;
         }
         else
@@ -271,8 +271,8 @@ CalibrationData &EyesCalibration::addData()
 
 
 /**************************************************************************/
-double EyesCalibration::runCalibration(Matrix &extrinsics_left,
-                                       Matrix &extrinsics_right)
+double EyesCalibration::calibrate(Matrix &extrinsics_left,
+                                  Matrix &extrinsics_right)
 {
     Rand::init();
 

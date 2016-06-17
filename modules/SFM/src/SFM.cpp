@@ -18,7 +18,9 @@
 
 #include <cmath>
 #include <algorithm>
+
 #include "SFM.h"
+#include "eyesCalibration.h"
 
 
 /******************************************************************************/
@@ -984,17 +986,160 @@ void SFM::convert(Mat& mat, Matrix& matrix)
 
 
 /******************************************************************************/
-bool SFM::respond(const Bottle& command, Bottle& reply) 
+bool SFM::pushExtrinsics(const string &eye, const Matrix &H)
 {
-    if(command.size()==0)
+    if ((eye!="left") && (eye!="right"))
         return false;
 
-    if (command.get(0).asString()=="quit") {
+    Bottle options;
+    Bottle &ext=options.addList();
+    ext.addString(eye=="left"?"camera_extrinsics_left":"camera_extrinsics_right");
+    Bottle &val=ext.addList();
+    for (int r=0; r<H.rows(); r++)
+        for (int c=0; c<H.cols(); c++)
+            val.addDouble(H(r,c));
+
+    return igaze->tweakSet(options);
+}
+
+
+/******************************************************************************/
+bool SFM::calibrate()
+{
+    mutexRecalibration.lock();
+    numberOfTrials=0;
+    doSFM=true;
+    mutexRecalibration.unlock();
+
+    calibEndEvent.reset();
+    calibEndEvent.wait();
+
+    if (calibUpdated)
+    {
+        R0=this->stereo->getRotation();
+        T0=this->stereo->getTranslation();
+        eyes0=eyes;
+        return true;
+    }
+    else
+        return false;
+}
+
+
+/******************************************************************************/
+double SFM::calibrateEyes(const Bottle &options)
+{
+    Bottle info;
+    igaze->getInfo(info);
+    double verMin=info.find("min_allowed_vergence").asDouble();
+
+    double verStep=2.0;
+    double verMax=40.0;
+    if (options.size()>0)
+    {
+        Value val=options.get(0);
+        if (val.isDouble())
+            verStep=val.asDouble();
+
+        if (options.size()>1)
+        {
+            Value val=options.get(1);
+            if (val.isDouble())
+                verMax=val.asDouble();
+        }
+    }
+
+    yInfo()<<"Stopping gaze and removing current extrinsics";
+    igaze->stopControl();
+    pushExtrinsics("left",eye(4,4));
+    pushExtrinsics("right",eye(4,4));
+
+    IPositionControl *ipos;
+    headCtrl.view(ipos);
+    ipos->setRefSpeed(5,50.0);
+
+    yInfo()<<"Acquiring data...";
+
+    EyesCalibration calibrator;
+    for (double ver=verMin; ver<=verMax; ver+=verStep)
+    {
+        yInfo()<<"Going to vergence "<<ver<< " [deg]...";
+        ipos->positionMove(5,ver);
+        bool done=false;
+        while (!done)
+        {
+            Time::delay(0.1);
+            ipos->checkMotionDone(5,&done);                
+        }
+        yInfo()<<"Target reached";
+
+        int cnt=1;
+        do
+        {
+            yInfo()<<"Calibrating the stereo rig at vergence "
+                   <<ver<<" [deg]; attempt #"<<cnt;
+            if (calibrate())
+            {
+                yInfo()<<"Calibration achieved successfully";
+                CalibrationData &data=calibrator.addData();
+                Vector x,o;
+
+                igaze->getLeftEyePose(x,o);
+                data.eye_kin_left=axis2dcm(o);
+                data.eye_kin_left.setSubcol(x,0,3);
+
+                igaze->getRightEyePose(x,o);
+                data.eye_kin_right=axis2dcm(o);
+                data.eye_kin_right.setSubcol(x,0,3);
+
+                convert(buildRotTras(R0,T0),data.fundamental);
+
+                yInfo()<<"Packaging data...";
+                yInfo()<<"eye_kin_left";
+                yInfo()<<data.eye_kin_left.toString(5,5);
+                yInfo()<<"eye_kin_right";
+                yInfo()<<data.eye_kin_right.toString(5,5);
+                yInfo()<<"fundamental";
+                yInfo()<<data.fundamental.toString(5,5);
+                break;
+            }
+        } while(cnt++<3);
+
+        if (cnt>=3)
+        {
+            yWarning()<<"Calibration failed at vergence "
+                      <<ver<<" [deg]";
+        }
+    }
+
+    yInfo()<<"Calibrating eyes...";
+    Matrix extrinsics_left,extrinsics_right;
+    double cost=calibrator.calibrate(extrinsics_left,extrinsics_right);
+    yInfo()<<"Final cost found: "<<cost;
+
+    yInfo()<<"Pushing new extrinsics to gaze";
+    pushExtrinsics("left",extrinsics_left);
+    pushExtrinsics("right",extrinsics_right);
+
+    return cost;
+}
+
+
+/******************************************************************************/
+bool SFM::respond(const Bottle& command, Bottle& reply) 
+{
+    if (command.size()==0)
+        return false;
+
+    string cmd=command.get(0).asString();
+
+    if (cmd=="quit")
+    {
         cout << "closing..." << endl;
         return false;
     }
 
-    if (command.get(0).asString()=="help") {
+    if (cmd=="help") {
         reply.addVocab(Vocab::encode("many"));
         reply.addString("Available commands are:");
         reply.addString("- [calibrate]: It recomputes the camera positions once.");
@@ -1017,53 +1162,38 @@ bool SFM::respond(const Bottle& command, Bottle& reply)
         return true;
     }
 
-    if (command.get(0).asString()=="calibrate")
+    if (cmd=="calibrate")
     {
-        mutexRecalibration.lock();
-        numberOfTrials=0;
-        doSFM=true;
-        mutexRecalibration.unlock();
-
-        calibEndEvent.reset();
-        calibEndEvent.wait();
-
-        if (calibUpdated)
-        {
-            R0=this->stereo->getRotation();
-            T0=this->stereo->getTranslation();
-            eyes0=eyes;
-
-            reply.addString("ACK");
-        }
-        else
-            reply.addString("Calibration failed after 5 trials.. Please show a non planar scene.");
-
+        reply.addString(calibrate()?"ACK":"Calibration failed after 5 trials.. Please show a non planar scene.");
         return true;
     }
-
-    if (command.get(0).asString()=="save")
+    else if (cmd=="save")
     {
         updateExtrinsics(R0,T0,eyes0,"STEREO_DISPARITY");
         reply.addString("ACK");
         return true;
     }
-
-    if (command.get(0).asString()=="getH")
+    else if (cmd=="getH")
     {
-        Mat RT0=buildRotTras(R0,T0);
-        Matrix H0; convert(RT0,H0);
-
+        Matrix H0;
+        convert(buildRotTras(R0,T0),H0);
         reply.read(H0);
         return true;
     }
-
-    if (command.get(0).asString()=="setNumDisp")
+    else if (cmd=="calibrate-eyes")
+    {
+        double cost=calibrateEyes(command.tail());
+        reply.addDouble(cost);
+    }
+    else if (cmd=="setNumDisp")
     {
         int dispNum=command.get(1).asInt();
         if(dispNum%32==0)
         {
             this->numberOfDisparities=dispNum;
-            this->setDispParameters(useBestDisp,uniquenessRatio,speckleWindowSize,speckleRange,numberOfDisparities,SADWindowSize,minDisparity,preFilterCap,disp12MaxDiff);
+            this->setDispParameters(useBestDisp,uniquenessRatio,speckleWindowSize,
+                                    speckleRange,numberOfDisparities,SADWindowSize,
+                                    minDisparity,preFilterCap,disp12MaxDiff);
             reply.addString("ACK");
             return true;
         }
@@ -1073,8 +1203,7 @@ bool SFM::respond(const Bottle& command, Bottle& reply)
             return true;
         }
     }
-
-    if (command.get(0).asString()=="setMinDisp")
+    else if (cmd=="setMinDisp")
     {
         int dispNum=command.get(1).asInt();
         this->minDisparity=dispNum;
@@ -1084,8 +1213,7 @@ bool SFM::respond(const Bottle& command, Bottle& reply)
         reply.addString("ACK");
         return true;
     }
-
-    if (command.get(0).asString()=="set" && command.size()==10)
+    else if ((cmd=="set") && (command.size()==10))
     {
         bool bestDisp=command.get(1).asInt() ? true : false;
         int uniquenessRatio=command.get(2).asInt();
@@ -1102,7 +1230,7 @@ bool SFM::respond(const Bottle& command, Bottle& reply)
                                 minDisparity,preFilterCap,disp12MaxDiff);
         reply.addString("ACK");
     }
-    else if (command.get(0).asString()=="Point" || command.get(0).asString()=="Left" )
+    else if ((cmd=="Point") || (cmd=="Left"))
     {
         int u = command.get(1).asInt();
         int v = command.get(2).asInt();
@@ -1111,7 +1239,7 @@ bool SFM::respond(const Bottle& command, Bottle& reply)
         reply.addDouble(point.y);
         reply.addDouble(point.z);
     }
-    else if (!command.get(0).isString() && command.size()==2)
+    else if (!command.get(0).isString() && (command.size()==2))
     {
         int u = command.get(0).asInt();
         int v = command.get(1).asInt();
@@ -1123,7 +1251,7 @@ bool SFM::respond(const Bottle& command, Bottle& reply)
         reply.addInt(uR);
         reply.addInt(vR);
     }
-    else if (command.get(0).asString()=="Right")
+    else if (cmd=="Right")
     {
         int u = command.get(1).asInt();
         int v = command.get(2).asInt();
@@ -1132,7 +1260,7 @@ bool SFM::respond(const Bottle& command, Bottle& reply)
         reply.addDouble(point.y);
         reply.addDouble(point.z);
     }
-    else if (command.get(0).asString()=="Root")
+    else if (cmd=="Root")
     {
         int u = command.get(1).asInt();
         int v = command.get(2).asInt();
@@ -1141,7 +1269,7 @@ bool SFM::respond(const Bottle& command, Bottle& reply)
         reply.addDouble(point.y);
         reply.addDouble(point.z);
     }
-    else if (command.get(0).asString()=="Rect")
+    else if (cmd=="Rect")
     {
         int tl_u = command.get(1).asInt();
         int tl_v = command.get(2).asInt();
@@ -1163,7 +1291,7 @@ bool SFM::respond(const Bottle& command, Bottle& reply)
             }
         }
     }
-    else if (command.get(0).asString()=="Points")
+    else if (cmd=="Points")
     {
         for (int cnt=1; cnt<command.size()-1; cnt+=2)
         {
@@ -1175,7 +1303,7 @@ bool SFM::respond(const Bottle& command, Bottle& reply)
             reply.addDouble(point.z);
         }
     }
-    else if (command.get(0).asString()=="Flood3D")
+    else if (cmd=="Flood3D")
     {
         cv::Point seed(command.get(1).asInt(),
                        command.get(2).asInt());
@@ -1201,7 +1329,7 @@ bool SFM::respond(const Bottle& command, Bottle& reply)
         else
             reply.addString("NACK");
     }
-    else if (command.get(0).asString()=="cart2stereo")
+    else if (cmd=="cart2stereo")
     {
         double x = command.get(1).asDouble();
         double y = command.get(2).asDouble();
@@ -1215,7 +1343,7 @@ bool SFM::respond(const Bottle& command, Bottle& reply)
         reply.addDouble(pointR.x);
         reply.addDouble(pointR.y);
     }
-    else if (command.get(0).asString()=="bilatfilt" && command.size()==3)
+    else if ((cmd=="bilatfilt") && (command.size()==3))
     {
         if (!doBLF){
             doBLF = true;
@@ -1228,7 +1356,7 @@ bool SFM::respond(const Bottle& command, Bottle& reply)
         reply.addString("BLF sigmaSpace ");
         reply.addDouble(sigmaSpaceBLF);
     }
-    else if (command.get(0).asString()=="doBLF")
+    else if (cmd=="doBLF")
     {
         bool onoffBLF = command.get(1).asBool();
         if (onoffBLF == false ){     // turn OFF Bilateral Filtering
@@ -1250,7 +1378,7 @@ bool SFM::respond(const Bottle& command, Bottle& reply)
         reply.addDouble(sigmaColorBLF);
         reply.addDouble(sigmaSpaceBLF);
     }
-    else if(command.size()>0 && command.size()%4==0)
+    else if(command.size()>0 && (command.size()%4==0))
     {
         for (int i=0; i<command.size(); i+=4)
         {

@@ -232,7 +232,6 @@ against OpenCV versions: 2.4.
 #include <iCub/stereoVision/stereoCamera.h>
 
 #include "fastBilateral.h"
-#include "eyesCalibration.h"
 
 #ifdef USING_GPU
     #include <iCub/stereoVision/utils.h>
@@ -293,6 +292,7 @@ class SFM: public yarp::os::RFModule
     bool calibUpdated;
     double sigmaColorBLF;
     double sigmaSpaceBLF;
+    bool init;
     bool doBLF;
     yarp::os::Mutex mutexRecalibration;
     Event calibEndEvent;
@@ -312,13 +312,15 @@ class SFM: public yarp::os::RFModule
     Matrix getCameraHGazeCtrl(int camera);
     void convert(Matrix& matrix, Mat& mat);
     void convert(Mat& mat, Matrix& matrix);
+    bool pushExtrinsics(const string &eye, const Matrix &H);
+    bool calibrate();
+    double calibrateEyes(const Bottle &options);
     void fillWorld3D(ImageOf<PixelRgbFloat> &worldCartImg, ImageOf<PixelRgbFloat> &worldCylImg);
     void floodFill(const Point &seed,const Point3f &p0, const double dist, set<int> &visited, Bottle &res);
     bool loadExtrinsics(yarp::os::ResourceFinder& rf, Mat& Ro, Mat& To, yarp::sig::Vector& eyes);
     bool updateExtrinsics(Mat& Rot, Mat& Tr, yarp::sig::Vector& eyes, const string& groupname);
     void updateViaGazeCtrl(const bool update);
-    void updateViaKinematics(const yarp::sig::Vector& deyes);
-    bool init;
+    void updateViaKinematics(const yarp::sig::Vector& deyes);    
 
 public:
 
