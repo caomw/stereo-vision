@@ -187,6 +187,7 @@ set to \e false in \e MIDDLEBURY and \e true in \e ROBOTICS.
     - [calibrate]: It recomputes the camera positions once.
     - [save]: It saves the current camera positions and uses it when the module starts.
     - [getH]: It returns the calibrated stereo matrix.
+    - [calibrate-eyes step max]: It finds out extrinsics parameters of eyes kinematics. Optional values \e step and \e max specify range for the vergence exploration.
     - [setNumDisp NumOfDisparities]: It sets the expected number of disparity (in pixel). Values must be divisible by 32. Good values are 64 for 320x240 images and 128 for 640x480 images.
     - [setMinDisp minDisparity]: It sets the minimum disparity (in pixel).
     - [Point x y]: Given the pixel coordinate x,y in the Left image the response is the 3D Point: X Y Z computed using the depth map wrt the LEFT eye. Points with non valid disparity (i.e. occlusions) are handled with the value (0.0,0.0,0.0).
@@ -320,7 +321,7 @@ class SFM: public yarp::os::RFModule
     bool loadExtrinsics(yarp::os::ResourceFinder& rf, Mat& Ro, Mat& To, yarp::sig::Vector& eyes);
     bool updateExtrinsics(Mat& Rot, Mat& Tr, yarp::sig::Vector& eyes, const string& groupname);
     void updateViaGazeCtrl(const bool update);
-    void updateViaKinematics(const yarp::sig::Vector& deyes);    
+    void updateViaKinematics(const yarp::sig::Vector& deyes);
 
 public:
 

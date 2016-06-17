@@ -1145,6 +1145,7 @@ bool SFM::respond(const Bottle& command, Bottle& reply)
         reply.addString("- [calibrate]: It recomputes the camera positions once.");
         reply.addString("- [save]: It saves the current camera positions and uses it when the module starts.");
         reply.addString("- [getH]: It returns the calibrated stereo matrix.");
+        reply.addString("- [calibrate-eyes step max]: It finds out extrinsics parameters of eyes kinematics. Optional values \"step\" and \"max\" specify range for the vergence exploration.");
         reply.addString("- [setNumDisp NumOfDisparities]: It sets the expected number of disparity (in pixel). Values must be divisible by 32. ");
         reply.addString("- [Point x y]: Given the pixel coordinate x,y in the Left image the response is the 3D Point: X Y Z computed using the depth map wrt the LEFT eye.");
         reply.addString("- [x y]: Given the pixel coordinate x,y in the Left image the response is the 3D Point: X Y Z ur vr computed using the depth map wrt the the ROOT reference system.(ur vr) is the corresponding pixel in the Right image. ");
