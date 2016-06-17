@@ -1033,8 +1033,8 @@ double SFM::calibrateEyes(const Bottle &options)
     igaze->getInfo(info);
     double verMin=info.find("min_allowed_vergence").asDouble();
 
-    double verStep=2.0;
-    double verMax=40.0;
+    double verStep=1.0;
+    double verMax=20.0;
     if (options.size()>0)
     {
         Value val=options.get(0);
@@ -1068,8 +1068,9 @@ double SFM::calibrateEyes(const Bottle &options)
         bool done=false;
         while (!done)
         {
-            Time::delay(0.1);
-            ipos->checkMotionDone(5,&done);                
+            Time::delay(1.0);
+            ipos->checkMotionDone(5,&done);
+            yInfo()<<"Checking target...";
         }
         yInfo()<<"Target reached";
 
@@ -1092,7 +1093,8 @@ double SFM::calibrateEyes(const Bottle &options)
                 data.eye_kin_right=axis2dcm(o);
                 data.eye_kin_right.setSubcol(x,0,3);
 
-                convert(buildRotTras(R0,T0),data.fundamental);
+                Mat H0=buildRotTras(R0,T0);
+                convert(H0,data.fundamental);
 
                 yInfo()<<"Packaging data...";
                 yInfo()<<"eye_kin_left";
@@ -1111,6 +1113,9 @@ double SFM::calibrateEyes(const Bottle &options)
                       <<ver<<" [deg]";
         }
     }
+
+    yInfo()<<"Homing vergence to "<<verMin<< " [deg]";
+    ipos->positionMove(5,verMin);
 
     yInfo()<<"Calibrating eyes...";
     Matrix extrinsics_left,extrinsics_right;
@@ -1176,9 +1181,12 @@ bool SFM::respond(const Bottle& command, Bottle& reply)
     }
     else if (cmd=="getH")
     {
-        Matrix H0;
-        convert(buildRotTras(R0,T0),H0);
-        reply.read(H0);
+        Mat H0=buildRotTras(R0,T0);
+
+        Matrix H;
+        convert(H0,H);
+        
+        reply.read(H);
         return true;
     }
     else if (cmd=="calibrate-eyes")

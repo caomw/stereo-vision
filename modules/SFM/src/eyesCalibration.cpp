@@ -48,7 +48,7 @@ struct Parameters
     Matrix lim;
 
     /**************************************************************************/
-    Parameters() : numParticles(20),
+    Parameters() : numParticles(40),
                    maxIter(std::numeric_limits<int>::max()),
                    maxT(std::numeric_limits<double>::infinity()),
                    omega(0.8),
@@ -57,12 +57,12 @@ struct Parameters
                    cost(0.0)
     {
         lim.resize(6,2);
-        lim(0,0)=-0.1;      lim(0,1)=0.1;
-        lim(1,0)=-0.1;      lim(1,1)=0.1;
-        lim(2,0)=-0.1;      lim(2,1)=0.1;
-        lim(3,0)=-M_PI;     lim(3,1)=M_PI;
-        lim(4,0)=-M_PI/2.0; lim(4,1)=M_PI/2.0;
-        lim(5,0)=-M_PI;     lim(5,1)=M_PI;
+        lim(0,0)=-0.02;         lim(0,1)=0.02;
+        lim(1,0)=-0.02;         lim(1,1)=0.02;
+        lim(2,0)=-0.02;         lim(2,1)=0.02;
+        lim(3,0)=-10.0*DEG2RAD; lim(3,1)=10.0*DEG2RAD;
+        lim(4,0)=-10.0*DEG2RAD; lim(4,1)=10.0*DEG2RAD;
+        lim(5,0)=-10.0*DEG2RAD; lim(5,1)=10.0*DEG2RAD;
     }
 };
 
@@ -101,12 +101,12 @@ class Optimizer
             for (size_t i=0; i<particle.pos.length(); i++)
                 particle.pos[i]=Rand::scalar(parameters.lim(i,0),parameters.lim(i,1));
             
-            particle.vel[0]=Rand::scalar(-1e-4,1e-4);
-            particle.vel[1]=Rand::scalar(-1e-4,1e-4);
-            particle.vel[2]=Rand::scalar(-1e-4,1e-4);
-            particle.vel[3]=Rand::scalar(-1.0,1.0)*DEG2RAD;
-            particle.vel[4]=Rand::scalar(-1.0,1.0)*DEG2RAD;
-            particle.vel[5]=Rand::scalar(-1.0,1.0)*DEG2RAD;
+            particle.vel[0]=Rand::scalar(-1e-5,1e-5);
+            particle.vel[1]=Rand::scalar(-1e-5,1e-5);
+            particle.vel[2]=Rand::scalar(-1e-5,1e-5);
+            particle.vel[3]=Rand::scalar(-0.1,0.1)*DEG2RAD;
+            particle.vel[4]=Rand::scalar(-0.1,0.1)*DEG2RAD;
+            particle.vel[5]=Rand::scalar(-0.1,0.1)*DEG2RAD;
         }
     }
 
@@ -127,9 +127,7 @@ class Optimizer
 
                 particle.cost+=norm(data[i].fundamental.getCol(3).subVector(0,2)-D.getCol(3).subVector(0,2));
                 particle.cost+=norm(dcm2rpy(data[i].fundamental)-dcm2rpy(D));
-                particle.cost+=0.1*norm(particle.pos.subVector(0,2));
             }
-
             particle.cost/=data.size();
         }
         
@@ -228,13 +226,14 @@ public:
         if ((iter%100)==0)
         {
             double mean=0.0;
-            for (size_t i=0; i<x.size(); i++)
-                mean+=norm(g.pos-x[i].pos);
-            
             if (x.size()>0)
+            {
+                for (size_t i=0; i<x.size(); i++)
+                    mean+=norm(g.pos-x[i].pos);            
                 mean/=x.size();
-            
-            if (mean<0.005)
+            }
+
+            if (mean<5e-9)
             {
                 randomize();
                 randomize_print=true;
