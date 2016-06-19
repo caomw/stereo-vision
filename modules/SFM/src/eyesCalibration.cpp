@@ -296,15 +296,13 @@ public:
         }
         
         t=Time::now()-t0;
-        bool term=(iter<parameters.maxIter) &&
-                  (g.cost[0]>parameters.cost[0]) &&
-                  (g.cost[1]>parameters.cost[1]) &&
-                  (t<parameters.maxT);
+        bool cont=(iter<parameters.maxIter) && (t<parameters.maxT) &&
+                  ((g.cost[0]>parameters.cost[0]) || (g.cost[1]>parameters.cost[1]));
         
         if ((iter%10)==0)
             print(randomize_print);
         
-        return term;
+        return cont;
     }
 
     /**************************************************************************/
