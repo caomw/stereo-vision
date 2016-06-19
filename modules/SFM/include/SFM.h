@@ -316,7 +316,7 @@ class SFM: public yarp::os::RFModule
     void convert(Mat& mat, Matrix& matrix);
     bool pushExtrinsics(const string &eye, const Matrix &H);
     bool calibrate();
-    double calibrateEyes(const Bottle &options);
+    Vector calibrateEyes(const Bottle &options);
     void fillWorld3D(ImageOf<PixelRgbFloat> &worldCartImg, ImageOf<PixelRgbFloat> &worldCylImg);
     void floodFill(const Point &seed,const Point3f &p0, const double dist, set<int> &visited, Bottle &res);
     bool loadExtrinsics(yarp::os::ResourceFinder& rf, Mat& Ro, Mat& To, yarp::sig::Vector& eyes);

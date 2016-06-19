@@ -45,7 +45,7 @@ struct Parameters
     double omega;
     double phi_p;
     double phi_g;
-    double cost;
+    Vector cost;
     Matrix lim;
 
     /**************************************************************************/
@@ -55,7 +55,7 @@ struct Parameters
                    omega(0.8),
                    phi_p(0.1),
                    phi_g(0.1),
-                   cost(0.0)
+                   cost(2,0.0)
     {
         lim.resize(6,2);
         lim(0,0)=-0.02;         lim(0,1)=0.02;
@@ -73,10 +73,26 @@ struct Particle
 {
     Vector pos;
     Vector vel;
-    double cost;    
+    Vector cost;    
     
     Particle() : pos(6,0.0), vel(6,0.0),
-                 cost(std::numeric_limits<double>::infinity()) { }
+                 cost(2,std::numeric_limits<double>::infinity()) { }
+
+    /**************************************************************************/
+    void copy_translation(const Particle &p)
+    {
+        pos.setSubvector(0,p.pos.subVector(0,2));
+        vel.setSubvector(0,p.vel.subVector(0,2));
+        cost[0]=p.cost[0];
+    }
+
+    /**************************************************************************/
+    void copy_orientation(const Particle &p)
+    {
+        pos.setSubvector(3,p.pos.subVector(3,5));
+        vel.setSubvector(3,p.vel.subVector(3,5));
+        cost[1]=p.cost[1];
+    }
 };
 
 
@@ -94,25 +110,35 @@ class Optimizer
     double t,t0;
 
     /**************************************************************************/
-    void randomize()
+    void randomize_translation()
     {
         for (size_t i=0; i<x.size(); i++)
         {
             Particle &particle=x[i];
-            for (size_t i=0; i<particle.pos.length(); i++)
+            for (size_t i=0; i<3; i++)
+            {
                 particle.pos[i]=Rand::scalar(parameters.lim(i,0),parameters.lim(i,1));
-            
-            particle.vel[0]=Rand::scalar(-1e-5,1e-5);
-            particle.vel[1]=Rand::scalar(-1e-5,1e-5);
-            particle.vel[2]=Rand::scalar(-1e-5,1e-5);
-            particle.vel[3]=Rand::scalar(-0.1,0.1)*DEG2RAD;
-            particle.vel[4]=Rand::scalar(-0.1,0.1)*DEG2RAD;
-            particle.vel[5]=Rand::scalar(-0.1,0.1)*DEG2RAD;
+                particle.vel[i]=Rand::scalar(-1e-5,1e-5);
+            }
         }
     }
 
     /**************************************************************************/
-    double evaluate(Particle &particle)
+    void randomize_orientation()
+    {
+        for (size_t i=0; i<x.size(); i++)
+        {
+            Particle &particle=x[i];
+            for (size_t i=3; i<particle.pos.length(); i++)
+            {
+                particle.pos[i]=Rand::scalar(parameters.lim(i,0),parameters.lim(i,1));
+                particle.vel[i]=Rand::scalar(-0.1,0.1)*DEG2RAD;
+            }
+        }
+    }
+
+    /**************************************************************************/
+    Vector evaluate(Particle &particle)
     {
         Matrix Hl,Hr;
         getExtrinsics(particle.pos,Hl,Hr);
@@ -126,8 +152,8 @@ class Optimizer
                 Matrix Hr_=data[i].eye_kin_right*Hr;
                 Matrix F=SE3inv(Hr_)*Hl_;
 
-                particle.cost+=norm(data[i].fundamental.getCol(3).subVector(0,2)-F.getCol(3).subVector(0,2));
-                particle.cost+=norm(dcm2rpy(data[i].fundamental)-dcm2rpy(F));
+                particle.cost[0]+=norm(data[i].fundamental.getCol(3).subVector(0,2)-F.getCol(3).subVector(0,2));
+                particle.cost[1]+=norm(dcm2rpy(data[i].fundamental)-dcm2rpy(F));
             }
             particle.cost/=data.size();
         }
@@ -141,7 +167,7 @@ class Optimizer
         ostringstream str;
         str<<"iter #"<<iter<<" t="<<setprecision(3)<<fixed<<t<<" [s]: ";
         str.unsetf(ios::floatfield);
-        str<<"cost="<<g.cost<<" ("<<parameters.cost<<"); ";
+        str<<"cost=["<<g.cost.toString(5,5)<<"] (["<<parameters.cost.toString(5,5)<<"]); ";
         if (randomize_print)
             str<<"particles scattered away";
         yInfo()<<str.str();
@@ -185,12 +211,18 @@ public:
     void init()
     {
         x.assign(parameters.numParticles,Particle());
-        randomize();
+        randomize_translation();
+        randomize_orientation();
         p=x;
         
         for (size_t i=0; i<x.size(); i++)
-            if (evaluate(p[i])<g.cost)
-                g=p[i];
+        {
+            Vector f=evaluate(p[i]);
+            if (f[0]<g.cost[0])
+                g.copy_translation(p[i]);
+            if (f[1]<g.cost[1])
+                g.copy_orientation(p[i]);
+        }
         
         iter=0;
         t0=Time::now();
@@ -214,37 +246,59 @@ public:
             for (size_t j=0; j<x[i].pos.length(); j++)
                 x[i].pos[j]=std::min(std::max(x[i].pos[j],parameters.lim(j,0)),parameters.lim(j,1));
             
-            double f=evaluate(x[i]);
-            if (f<p[i].cost)
+            Vector f=evaluate(x[i]);
+            if (f[0]<p[i].cost[0])
             {
-                p[i]=x[i];
-                p[i].cost=f;
-                if (f<g.cost)
-                    g=p[i];
+                p[i].copy_translation(x[i]);
+                p[i].cost[0]=f[0];
+                if (f[0]<g.cost[0])
+                    g.copy_translation(p[i]); 
+            }
+            if (f[1]<p[i].cost[1])
+            {
+                p[i].copy_orientation(x[i]);
+                p[i].cost[1]=f[1];
+                if (f[1]<g.cost[1])
+                    g.copy_orientation(p[i]); 
             }
         }
         
         bool randomize_print=false;
         if ((iter%100)==0)
         {
-            double mean=0.0;
+            double mean;
+
+            mean=0.0;
             if (x.size()>0)
             {
                 for (size_t i=0; i<x.size(); i++)
-                    mean+=norm(g.pos-x[i].pos);            
+                    mean+=norm(g.pos.subVector(0,2)-x[i].pos.subVector(0,2));
                 mean/=x.size();
             }
-
             if (mean<5e-9)
             {
-                randomize();
+                randomize_translation();
+                randomize_print=true;
+            }
+
+            mean=0.0;
+            if (x.size()>0)
+            {
+                for (size_t i=0; i<x.size(); i++)
+                    mean+=norm(g.pos.subVector(3,5)-x[i].pos.subVector(3,5));
+                mean/=x.size();
+            }
+            if (mean<5e-9)
+            {
+                randomize_orientation();
                 randomize_print=true;
             }
         }
         
         t=Time::now()-t0;
         bool term=(iter<parameters.maxIter) &&
-                  (g.cost>parameters.cost) &&
+                  (g.cost[0]>parameters.cost[0]) &&
+                  (g.cost[1]>parameters.cost[1]) &&
                   (t<parameters.maxT);
         
         if ((iter%10)==0)
@@ -272,7 +326,7 @@ CalibrationData &EyesCalibration::addData()
 
 
 /**************************************************************************/
-double EyesCalibration::calibrate(Matrix &extrinsics_left,
+Vector EyesCalibration::calibrate(Matrix &extrinsics_left,
                                   Matrix &extrinsics_right,
                                   const string &logFile)
 {
@@ -295,7 +349,7 @@ double EyesCalibration::calibrate(Matrix &extrinsics_left,
     double t=Time::now()-t0;
 
     const Particle &g=swarm.finalize();    
-    yInfo()<<"solution: ("<<g.pos.toString(5,5)<<") "
+    yInfo()<<"solution: ["<<g.pos.toString(5,5)<<"] "
            <<"found in "<<t<<" [s]";
 
     swarm.getExtrinsics(g.pos,extrinsics_left,extrinsics_right);

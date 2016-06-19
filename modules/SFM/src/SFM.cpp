@@ -1030,7 +1030,7 @@ bool SFM::calibrate()
 
 
 /******************************************************************************/
-double SFM::calibrateEyes(const Bottle &options)
+Vector SFM::calibrateEyes(const Bottle &options)
 {
     Bottle info;
     igaze->getInfo(info);
@@ -1127,8 +1127,8 @@ double SFM::calibrateEyes(const Bottle &options)
 
     yInfo()<<"Calibrating eyes...";
     Matrix extrinsics_left,extrinsics_right;
-    double cost=calibrator.calibrate(extrinsics_left,extrinsics_right,eyesCalibFile);
-    yInfo()<<"Final cost found: "<<cost;
+    Vector cost=calibrator.calibrate(extrinsics_left,extrinsics_right,eyesCalibFile);
+    yInfo()<<"Final cost found: ["<<cost.toString(5,5)<<"]";
 
     yInfo()<<"Pushing new extrinsics to gaze";
     pushExtrinsics("left",extrinsics_left);
@@ -1199,8 +1199,8 @@ bool SFM::respond(const Bottle& command, Bottle& reply)
     }
     else if (cmd=="calibrate-eyes")
     {
-        double cost=calibrateEyes(command.tail());
-        reply.addDouble(cost);
+        Vector cost=calibrateEyes(command.tail());
+        reply.read(cost);
     }
     else if (cmd=="setNumDisp")
     {

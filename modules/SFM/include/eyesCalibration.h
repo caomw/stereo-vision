@@ -43,8 +43,8 @@ class EyesCalibration
 
 public:
     CalibrationData &addData();
-    double calibrate(yarp::sig::Matrix &extrinsics_left,
-                     yarp::sig::Matrix &extrinsics_right,
-                     const std::string &logFile);
+    yarp::sig::Vector calibrate(yarp::sig::Matrix &extrinsics_left,
+                                yarp::sig::Matrix &extrinsics_right,
+                                const std::string &logFile);
 };
 
