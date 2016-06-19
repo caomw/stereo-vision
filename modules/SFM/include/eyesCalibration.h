@@ -24,11 +24,13 @@
 /**************************************************************************/
 struct CalibrationData
 {
+    double vergence;
     yarp::sig::Matrix eye_kin_left;
     yarp::sig::Matrix eye_kin_right;
     yarp::sig::Matrix fundamental;
 
-    CalibrationData() : eye_kin_left(yarp::math::eye(4,4)),
+    CalibrationData() : vergence(0.0),
+                        eye_kin_left(yarp::math::eye(4,4)),
                         eye_kin_right(yarp::math::eye(4,4)),
                         fundamental(yarp::math::eye(4,4)) { }
 };

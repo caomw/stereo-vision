@@ -310,9 +310,10 @@ double EyesCalibration::calibrate(Matrix &extrinsics_left,
             Matrix F=SE3inv(Hr_)*Hl_;
 
             fout<<"[data_"<<i<<"]"<<endl;
-            fout<<"measurement"<<endl;
+            fout<<"vergence="<<data[i].vergence<<" [deg]"<<endl;
+            fout<<"measured fundamental matrix"<<endl;
             fout<<data[i].fundamental.toString(5,5)<<endl;
-            fout<<"estimate"<<endl;
+            fout<<"estimate fundamental matrix"<<endl;
             fout<<F.toString(5,5)<<endl;
             fout<<endl;
         }

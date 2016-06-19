@@ -1077,17 +1077,19 @@ double SFM::calibrateEyes(const Bottle &options)
         }
         yInfo()<<"Target reached";
 
-        int cnt=1;
+        int cntTot=1;
+        int cntOk=1;
         do
         {
             yInfo()<<"Calibrating the stereo rig at vergence "
-                   <<ver<<" [deg]; attempt #"<<cnt;
+                   <<ver<<" [deg]; attempt #"<<cntTot;
             if (calibrate())
             {
                 yInfo()<<"Calibration achieved successfully";
                 CalibrationData &data=calibrator.addData();
-                Vector x,o;
+                data.vergence=ver;
 
+                Vector x,o;
                 igaze->getLeftEyePose(x,o);
                 data.eye_kin_left=axis2dcm(o);
                 data.eye_kin_left.setSubcol(x,0,3);
@@ -1106,11 +1108,14 @@ double SFM::calibrateEyes(const Bottle &options)
                 yInfo()<<data.eye_kin_right.toString(5,5);
                 yInfo()<<"fundamental";
                 yInfo()<<data.fundamental.toString(5,5);
-                break;
-            }
-        } while(cnt++<3);
 
-        if (cnt>=3)
+                cntTot=1;
+                if (cntOk++>2)
+                    break;
+            }
+        } while(cntTot++<3);
+
+        if (cntTot>=3)
         {
             yWarning()<<"Calibration failed at vergence "
                       <<ver<<" [deg]";
