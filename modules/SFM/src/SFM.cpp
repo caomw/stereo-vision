@@ -1110,7 +1110,7 @@ double SFM::calibrateEyes(const Bottle &options)
                 yInfo()<<data.fundamental.toString(5,5);
 
                 cntTot=1;
-                if (cntOk++>2)
+                if (cntOk++>=3)
                     break;
             }
         } while(cntTot++<3);
