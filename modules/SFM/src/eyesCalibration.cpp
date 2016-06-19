@@ -171,6 +171,7 @@ public:
 
             Vector y=x;
             y[0]=-y[0];
+            y[4]=-y[4];
             y[5]=-y[5];
             Hl=rpy2dcm(y.subVector(3,5));
             Hl.setSubcol(y.subVector(0,2),0,3);
