@@ -15,6 +15,7 @@
  * Public License for more details
 */
 
+#include <string>
 #include <deque>
 #include <yarp/sig/all.h>
 #include <yarp/math/Math.h>
@@ -41,6 +42,7 @@ class EyesCalibration
 public:
     CalibrationData &addData();
     double calibrate(yarp::sig::Matrix &extrinsics_left,
-                     yarp::sig::Matrix &extrinsics_right);
+                     yarp::sig::Matrix &extrinsics_right,
+                     const std::string &logFile);
 };
 

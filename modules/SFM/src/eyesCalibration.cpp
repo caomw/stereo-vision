@@ -19,6 +19,7 @@
 #include <limits>
 #include <algorithm>
 #include <sstream>
+#include <fstream>
 #include <iomanip>
 
 #include <yarp/os/Time.h>
@@ -123,10 +124,10 @@ class Optimizer
             {
                 Matrix Hl_=data[i].eye_kin_left*Hl;
                 Matrix Hr_=data[i].eye_kin_right*Hr;
-                Matrix D=SE3inv(Hr_)*Hl_;
+                Matrix F=SE3inv(Hr_)*Hl_;
 
-                particle.cost+=norm(data[i].fundamental.getCol(3).subVector(0,2)-D.getCol(3).subVector(0,2));
-                particle.cost+=norm(dcm2rpy(data[i].fundamental)-dcm2rpy(D));
+                particle.cost+=norm(data[i].fundamental.getCol(3).subVector(0,2)-F.getCol(3).subVector(0,2));
+                particle.cost+=norm(dcm2rpy(data[i].fundamental)-dcm2rpy(F));
             }
             particle.cost/=data.size();
         }
@@ -271,13 +272,14 @@ CalibrationData &EyesCalibration::addData()
 
 /**************************************************************************/
 double EyesCalibration::calibrate(Matrix &extrinsics_left,
-                                  Matrix &extrinsics_right)
+                                  Matrix &extrinsics_right,
+                                  const string &logFile)
 {
     Rand::init();
 
     Optimizer swarm(data);
     swarm.getParameters().maxT=10.0;    
-    swarm.init();    
+    swarm.init();
 
     int cnt=0;
     double t0=Time::now();
@@ -295,7 +297,28 @@ double EyesCalibration::calibrate(Matrix &extrinsics_left,
     yInfo()<<"solution: ("<<g.pos.toString(5,5)<<") "
            <<"found in "<<t<<" [s]";
 
-    swarm.getExtrinsics(g.pos,extrinsics_left,extrinsics_right);    
+    swarm.getExtrinsics(g.pos,extrinsics_left,extrinsics_right);
+
+    ofstream fout;
+    fout.open(logFile.c_str());
+    if (fout.is_open())
+    {
+        for (size_t i=0; i<data.size(); i++)
+        {
+            Matrix Hl_=data[i].eye_kin_left*extrinsics_left;
+            Matrix Hr_=data[i].eye_kin_right*extrinsics_right;
+            Matrix F=SE3inv(Hr_)*Hl_;
+
+            fout<<"[data_"<<i<<"]"<<endl;
+            fout<<"measurement"<<endl;
+            fout<<data[i].fundamental.toString(5,5)<<endl;
+            fout<<"estimate"<<endl;
+            fout<<F.toString(5,5)<<endl;
+            fout<<endl;
+        }
+        fout.close();
+    }
+
     return g.cost;
 }
 

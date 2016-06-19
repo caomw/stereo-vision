@@ -280,6 +280,7 @@ class SFM: public yarp::os::RFModule
 
     int numberOfTrials;
     string camCalibFile;
+    string eyesCalibFile;
     bool useBestDisp;
     int uniquenessRatio;
     int speckleWindowSize;
