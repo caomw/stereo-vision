@@ -352,6 +352,7 @@ Vector EyesCalibration::calibrate(Matrix &extrinsics_left,
 
     swarm.getExtrinsics(g.pos,extrinsics_left,extrinsics_right);
 
+    yInfo()<<"Saving results in "<<logFile;
     ofstream fout;
     fout.open(logFile.c_str());
     if (fout.is_open())
