@@ -49,7 +49,7 @@ struct Parameters
     Matrix lim;
 
     /**************************************************************************/
-    Parameters() : numParticles(40),
+    Parameters() : numParticles(20),
                    maxIter(std::numeric_limits<int>::max()),
                    maxT(std::numeric_limits<double>::infinity()),
                    omega(0.8),
@@ -275,7 +275,7 @@ public:
                     mean+=norm(g.pos.subVector(0,2)-x[i].pos.subVector(0,2));
                 mean/=x.size();
             }
-            if (mean<5e-9)
+            if (mean<5e-4)
             {
                 randomize_translation();
                 randomize_print=true;
@@ -288,7 +288,7 @@ public:
                     mean+=norm(g.pos.subVector(3,5)-x[i].pos.subVector(3,5));
                 mean/=x.size();
             }
-            if (mean<5e-9)
+            if (mean<5e-8)
             {
                 randomize_orientation();
                 randomize_print=true;
@@ -331,7 +331,7 @@ Vector EyesCalibration::calibrate(Matrix &extrinsics_left,
     Rand::init();
 
     Optimizer swarm(data);
-    swarm.getParameters().maxT=10.0;    
+    swarm.getParameters().maxT=10.0;
     swarm.init();
 
     int cnt=0;
